@@ -22,6 +22,16 @@ class TestCodeBlockPostprocessor(unittest.TestCase):
         text = "<pre><code class=\"language-shell\">ping github.com/gabesw</code></pre>"
         processed_text = self.postprocessor.run(text)
         self.assertEqual(processed_text, "<ac:structured-macro ac:name=\"code\"><ac:parameter ac:name=\"language\">shell</ac:parameter><ac:plain-text-body><![CDATA[ping github.com/gabesw]]></ac:plain-text-body></ac:structured-macro>")
+    
+    def test_run_with_html_entities(self):
+        text = "<pre><code class=\"language-json\">{&quot;name&quot;: &quot;value&quot;}</code></pre>"
+        processed_text = self.postprocessor.run(text)
+        self.assertEqual(processed_text, "<ac:structured-macro ac:name=\"code\"><ac:parameter ac:name=\"language\">json</ac:parameter><ac:plain-text-body><![CDATA[{\"name\": \"value\"}]]></ac:plain-text-body></ac:structured-macro>")
+    
+    def test_run_without_language(self):
+        text = "<pre><code>echo 'hello world'</code></pre>"
+        processed_text = self.postprocessor.run(text)
+        self.assertEqual(processed_text, "<ac:structured-macro ac:name=\"code\"><ac:parameter ac:name=\"language\">none</ac:parameter><ac:plain-text-body><![CDATA[echo 'hello world']]></ac:plain-text-body></ac:structured-macro>")
 
 class TestConfluenceExtension(unittest.TestCase):
     def test_extend_markdown(self):

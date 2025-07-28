@@ -4,6 +4,7 @@ pages in a nicer way than pure markdown.
 """
 
 import re
+import html
 from markdown.postprocessors import Postprocessor
 from markdown.preprocessors import Preprocessor
 from markdown.extensions import Extension
@@ -31,17 +32,32 @@ class CodeBlockPostprocessor(Postprocessor):
         """
         Replaces HTML code blocks with Confluence code snippet macros with language support.
         """
-        # replace code blocks with confluence code blocks using the code snippets macro format
-        #TODO: add if statement to check for the language tag and if it doesnt exist set language to none
+        def decode_and_wrap(match):
+            """Helper function to decode HTML entities and wrap in CDATA"""
+            language = match.group(1) if match.lastindex >= 1 else "none"
+            code_content = match.group(2) if match.lastindex >= 2 else match.group(1)
+            # Decode HTML entities in the code content
+            decoded_content = html.unescape(code_content)
+            return f'<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">{language}</ac:parameter><ac:plain-text-body><![CDATA[{decoded_content}]]></ac:plain-text-body></ac:structured-macro>'
+        
+        # First, handle code blocks with language specification
         processed_text = re.sub(
-            r'<pre><code class="language-(\w+)">(.*?)\n?</code></pre>', 
-            r'<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">\1</ac:parameter><ac:plain-text-body><![CDATA[\2]]></ac:plain-text-body></ac:structured-macro>', 
+            r'<pre><code class="language-(\w+)">(.*?)</code></pre>', 
+            decode_and_wrap,
             text,
             flags=re.DOTALL
         )
-        #map certain languages to supported confluence languages
-        if processed_text != text: #text was changed
-            #<ac:parameter ac:name="language">\1</ac:parameter>
+        
+        # Then handle code blocks without language specification
+        processed_text = re.sub(
+            r'<pre><code>(.*?)</code></pre>', 
+            decode_and_wrap,
+            processed_text,
+            flags=re.DOTALL
+        )
+        
+        # Map certain languages to supported confluence languages
+        if processed_text != text:
             processed_text = re.sub(
                 r'<ac:parameter ac:name="language">bash</ac:parameter>', 
                 r'<ac:parameter ac:name="language">shell</ac:parameter>', 
