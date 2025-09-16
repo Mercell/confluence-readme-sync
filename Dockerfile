@@ -1,14 +1,15 @@
 FROM python:3-slim
-ADD . /action
 
 WORKDIR /action
 
+# Copy Pipfile and install dependencies
 COPY ./Pipfile* ./
 RUN pip install pipenv && \
   pipenv install --system --deploy && \
   pipenv --clear
 
-COPY ./src .
+# Copy all action files including source code
+COPY . /action
 
 ENTRYPOINT [ "python" ]
 CMD [ "/action/main.py" ]

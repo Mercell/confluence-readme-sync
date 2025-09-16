@@ -3,6 +3,7 @@ import json
 import requests
 from requests import Response
 from requests.auth import HTTPBasicAuth
+from typing import BinaryIO
 
 class CommandInput(ABC):
     """
@@ -39,7 +40,7 @@ class EditPageCommandInput(CommandInput):
     """
     Concrete implementation of CommandInput for the :class:`EditPageCommand` class.
     """
-    
+
     def __init__(self, domain: str, page_id: str, page_status: str, page_title: str, page_body: str, version_number: int):
         """
         Initialize the command input with domain, page ID, page status, page title, page body, and version number.
@@ -57,6 +58,28 @@ class EditPageCommandInput(CommandInput):
         self.title = page_title
         self.body = page_body
         self.version = version_number + 1
+
+
+class UploadAttachmentCommandInput(CommandInput):
+    """
+    Concrete implementation of CommandInput for the :class:`UploadAttachmentCommand` class.
+    """
+
+    def __init__(self, domain: str, page_id: str, filename: str, file_content: BinaryIO, comment: str = None):
+        """
+        Initialize the command input with domain, page ID, filename, and file content.
+
+        :param domain: The domain of the API to interact with.
+        :param page_id: The ID of the page to upload attachment to.
+        :param filename: The name of the file to upload.
+        :param file_content: The binary content of the file.
+        :param comment: Optional comment for the attachment.
+        """
+        super().__init__(domain)
+        self.page_id = page_id
+        self.filename = filename
+        self.file_content = file_content
+        self.comment = comment
 
 
 class ApiCommand(ABC):
@@ -176,12 +199,58 @@ class EditPageCommand(ApiCommand):
         )
 
 
+class UploadAttachmentCommand(ApiCommand):
+    """
+    Concrete implementation of ApiCommand for uploading an attachment to a page.
+    This class plays the role of a Concrete Command in the Command pattern.
+    """
+
+    def __init__(self, input: UploadAttachmentCommandInput):
+        """
+        Initialize the command with an UploadAttachmentCommandInput.
+
+        :param input: The command input to use.
+        """
+        super().__init__(input)
+        self.input = input
+
+    def execute(self, auth: HTTPBasicAuth) -> Response:
+        """
+        Execute the command by sending a POST request to upload attachment.
+
+        :param auth: The HTTPBasicAuth to use for authentication.
+        :return: The response from the API.
+        """
+        url = f"https://{self.input.domain}/wiki/rest/api/content/{self.input.page_id}/child/attachment"
+
+        headers = {
+            "X-Atlassian-Token": "nocheck",
+            "Accept": "application/json"
+        }
+
+        files = {
+            'file': (self.input.filename, self.input.file_content)
+        }
+
+        data = {}
+        if self.input.comment:
+            data['comment'] = self.input.comment
+
+        return requests.post(
+            url,
+            headers=headers,
+            files=files,
+            data=data,
+            auth=auth
+        )
+
+
 class ConfluenceClient:
     """
-    Client class for interacting with the API. 
+    Client class for interacting with the API.
     This class plays the role of the Invoker in the Command pattern.
     """
-    
+
     def __init__(self, auth: HTTPBasicAuth):
         """
         Initialize the client with an HTTPBasicAuth object.
@@ -189,7 +258,7 @@ class ConfluenceClient:
         :param auth: The HTTPBasicAuth to use for authentication.
         """
         self.auth = auth
-    
+
     def send(self, command: ApiCommand):
         """
         Send a command to the API and return the response.
