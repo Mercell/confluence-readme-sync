@@ -1,8 +1,10 @@
 import json
 from os import environ
 from typing import Dict
+from pathlib import Path
 from src.utils import extract_domain_and_page_id
-from src.api import ConfluenceClient, GetPageCommand, GetPageCommandInput, EditPageCommand, EditPageCommandInput
+from src.api import ConfluenceClient, GetPageCommand, GetPageCommandInput, EditPageCommand, EditPageCommandInput, UploadAttachmentCommand, UploadAttachmentCommandInput
+from src.image_processor import ImageProcessor
 from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 import markdown
@@ -52,9 +54,37 @@ def main() -> None:
     with open(vars["filepath"], 'r') as f:
         md_text = f.read()
 
+    # Process images in markdown
+    logging.info("Processing images in markdown.")
+    image_processor = ImageProcessor(base_path=Path(vars["filepath"]).parent)
+    processed_md_text, images_to_upload = image_processor.process_markdown_images(md_text)
+
+    # Upload local images as attachments
+    for image_info in images_to_upload:
+        try:
+            logging.info(f"Uploading image: {image_info['filename']}")
+            with open(image_info['path'], 'rb') as img_file:
+                upload_input = UploadAttachmentCommandInput(
+                    domain=domain,
+                    page_id=page_id,
+                    filename=image_info['filename'],
+                    file_content=img_file,
+                    comment="Uploaded by confluence-readme-sync"
+                )
+                upload_command = UploadAttachmentCommand(upload_input)
+                upload_response = client.send(upload_command)
+
+                if upload_response.status_code in [200, 201]:
+                    logging.info(f"Successfully uploaded: {image_info['filename']}")
+                    image_processor.mark_as_uploaded(image_info['path'], image_info['filename'])
+                else:
+                    logging.warning(f"Failed to upload {image_info['filename']}: {upload_response.status_code}")
+        except Exception as e:
+            logging.error(f"Error uploading {image_info['filename']}: {str(e)}")
+
     # convert markdown file to html
     logging.info("Converting markdown file.")
-    converted_html = markdown.markdown(md_text, extensions=['tables', 'fenced_code', ConfluenceExtension()])
+    converted_html = markdown.markdown(processed_md_text, extensions=['tables', 'fenced_code', ConfluenceExtension()])
 
     # insert markdown between insert_start_text and insert_end_text
     start_substring: str = vars["insert_start_text"]

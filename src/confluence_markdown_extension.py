@@ -24,6 +24,27 @@ class SectionLinkPreprocessor(Preprocessor):
             modified_lines.append(re.sub(r'\]\(#+', r'](#', line, flags=re.DOTALL))
         return modified_lines
 
+class ImagePreprocessor(Preprocessor):
+    """
+    A preprocessor that converts confluence-attachment placeholders to Confluence image macros.
+    """
+    def run(self, lines: list[str]) -> list[str]:
+        """
+        Converts image references with confluence-attachment: prefix to Confluence image macros.
+        """
+        modified_lines: list[str] = []
+        for line in lines:
+            # Replace confluence-attachment: image references with Confluence image macro
+            # Pattern: ![alt](confluence-attachment:filename)
+            line = re.sub(
+                r'!\[([^\]]*)\]\(confluence-attachment:([^\)]+)\)',
+                r'<ac:image ac:alt="\1"><ri:attachment ri:filename="\2" /></ac:image>',
+                line
+            )
+            modified_lines.append(line)
+        return modified_lines
+
+
 class CodeBlockPostprocessor(Postprocessor):
     """
     A postprocessor that reformats HTML code blocks to Confluence code snippet macros.
@@ -39,28 +60,28 @@ class CodeBlockPostprocessor(Postprocessor):
             # Decode HTML entities in the code content
             decoded_content = html.unescape(code_content)
             return f'<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">{language}</ac:parameter><ac:plain-text-body><![CDATA[{decoded_content}]]></ac:plain-text-body></ac:structured-macro>'
-        
+
         # First, handle code blocks with language specification
         processed_text = re.sub(
-            r'<pre><code class="language-(\w+)">(.*?)</code></pre>', 
+            r'<pre><code class="language-(\w+)">(.*?)</code></pre>',
             decode_and_wrap,
             text,
             flags=re.DOTALL
         )
-        
+
         # Then handle code blocks without language specification
         processed_text = re.sub(
-            r'<pre><code>(.*?)</code></pre>', 
+            r'<pre><code>(.*?)</code></pre>',
             decode_and_wrap,
             processed_text,
             flags=re.DOTALL
         )
-        
+
         # Map certain languages to supported confluence languages
         if processed_text != text:
             processed_text = re.sub(
-                r'<ac:parameter ac:name="language">bash</ac:parameter>', 
-                r'<ac:parameter ac:name="language">shell</ac:parameter>', 
+                r'<ac:parameter ac:name="language">bash</ac:parameter>',
+                r'<ac:parameter ac:name="language">shell</ac:parameter>',
                 processed_text,
                 flags=re.DOTALL
             )
@@ -75,7 +96,8 @@ class ConfluenceExtension(Extension):
         Adds the processors to the extension.
         """
         md.registerExtension(self)
-        md.preprocessors.register(SectionLinkPreprocessor(md), 'confluence_section_links', 0)
+        md.preprocessors.register(ImagePreprocessor(md), 'confluence_images', 0)
+        md.preprocessors.register(SectionLinkPreprocessor(md), 'confluence_section_links', 1)
         md.postprocessors.register(CodeBlockPostprocessor(md), 'confluence_code_block', 0)
 
 def makeExtension(*args, **kwargs):
