@@ -56,7 +56,21 @@ def main() -> None:
 
     # Process images in markdown
     logging.info("Processing images in markdown.")
-    image_processor = ImageProcessor(base_path=Path(vars["filepath"]).parent)
+    # Get the directory containing the markdown file
+    markdown_file_path = Path(vars["filepath"])
+    base_path = markdown_file_path.parent
+    logging.info(f"Using base path for images: {base_path}")
+    logging.info(f"Markdown file path: {markdown_file_path}")
+
+    # Set GITHUB_WORKSPACE if running in GitHub Actions and not already set
+    # This helps with image path resolution
+    if 'GITHUB_WORKSPACE' not in environ and 'GITHUB_ACTION' in environ:
+        # Try to determine workspace from the filepath
+        workspace = str(markdown_file_path.parent)
+        environ['GITHUB_WORKSPACE'] = workspace
+        logging.info(f"Set GITHUB_WORKSPACE to: {workspace}")
+
+    image_processor = ImageProcessor(base_path=base_path)
     processed_md_text, images_to_upload = image_processor.process_markdown_images(md_text)
 
     # Upload local images as attachments

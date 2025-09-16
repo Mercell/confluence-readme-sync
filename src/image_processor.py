@@ -90,6 +90,7 @@ class ImageProcessor:
         for full_match, alt_text, image_path in images:
             if self.is_local_path(image_path):
                 resolved_path = self.resolve_image_path(image_path)
+                logging.debug(f"Resolving image path: {image_path} -> {resolved_path} (base_path: {self.base_path})")
 
                 if resolved_path.exists():
                     filename = self.get_filename_from_path(image_path)
@@ -108,7 +109,50 @@ class ImageProcessor:
                     placeholder = f'![{alt_text}](confluence-attachment:{filename})'
                     modified_content = modified_content.replace(full_match, placeholder)
                 else:
-                    logging.warning(f"Image file not found: {resolved_path}")
+                    # Try multiple fallback locations for the image
+                    found = False
+                    attempts = [resolved_path]
+
+                    # Try workspace root if GITHUB_WORKSPACE is set
+                    if 'GITHUB_WORKSPACE' in os.environ:
+                        workspace_root = Path(os.environ['GITHUB_WORKSPACE'])
+                        workspace_fallback = workspace_root / image_path
+                        attempts.append(workspace_fallback)
+
+                        # Also try combining markdown's subdirectory with image path
+                        # e.g., if markdown is in docs/ and image ref is img/pic.png
+                        # try docs/img/pic.png from workspace root
+                        if self.base_path != workspace_root:
+                            try:
+                                relative_base = self.base_path.relative_to(workspace_root)
+                                combined_path = workspace_root / relative_base / image_path
+                                attempts.append(combined_path)
+                            except ValueError:
+                                # base_path is not relative to workspace_root
+                                pass
+
+                    for attempt_path in attempts:
+                        if attempt_path.exists():
+                            logging.info(f"Found image at: {attempt_path}")
+                            filename = self.get_filename_from_path(image_path)
+
+                            if str(attempt_path) not in self.uploaded_attachments:
+                                images_to_upload.append({
+                                    'path': str(attempt_path),
+                                    'filename': filename,
+                                    'alt_text': alt_text,
+                                    'original_ref': full_match
+                                })
+
+                            placeholder = f'![{alt_text}](confluence-attachment:{filename})'
+                            modified_content = modified_content.replace(full_match, placeholder)
+                            found = True
+                            break
+
+                    if not found:
+                        logging.warning(f"Image file not found. Tried paths:")
+                        for attempt_path in attempts:
+                            logging.warning(f"  - {attempt_path}")
 
         return modified_content, images_to_upload
 
