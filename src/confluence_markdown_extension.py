@@ -110,15 +110,13 @@ class ConfluenceExtension(Extension):
     """
     The extension to be included in the `extensions` argument of the :ref:`Markdown.markdown` function.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, max_image_width=None, **kwargs):
         """
         Initialize the extension with optional configuration.
 
         :param max_image_width: Maximum width for images in pixels (string or None)
         """
-        self.config = {
-            'max_image_width': [None, 'Maximum width for images in pixels']
-        }
+        self.max_image_width = max_image_width
         super().__init__(**kwargs)
 
     def extendMarkdown(self, md: Markdown):
@@ -126,8 +124,7 @@ class ConfluenceExtension(Extension):
         Adds the processors to the extension.
         """
         md.registerExtension(self)
-        max_width = self.getConfig('max_image_width')
-        md.preprocessors.register(ImagePreprocessor(md, max_width=max_width), 'confluence_images', 0)
+        md.preprocessors.register(ImagePreprocessor(md, max_width=self.max_image_width), 'confluence_images', 0)
         md.preprocessors.register(SectionLinkPreprocessor(md), 'confluence_section_links', 1)
         md.postprocessors.register(CodeBlockPostprocessor(md), 'confluence_code_block', 0)
 
