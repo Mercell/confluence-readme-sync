@@ -100,8 +100,11 @@ class TestImageProcessor(unittest.TestCase):
             # Original markdown should be unchanged
             self.assertEqual(modified_md, markdown)
 
-            # Warning should be logged
-            mock_warning.assert_called_once()
+            # Warnings should be logged (multiple calls for missing file message and paths tried)
+            self.assertTrue(mock_warning.called)
+            # Check that at least one warning mentions the missing file
+            warning_messages = [str(call[0][0]) for call in mock_warning.call_args_list]
+            self.assertTrue(any('Image file not found' in msg or 'missing.png' in msg for msg in warning_messages))
 
     def test_mark_as_uploaded(self):
         """Test marking images as uploaded."""

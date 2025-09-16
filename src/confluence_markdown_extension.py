@@ -28,6 +28,16 @@ class ImagePreprocessor(Preprocessor):
     """
     A preprocessor that converts confluence-attachment placeholders to Confluence image macros.
     """
+    def __init__(self, md, max_width=None):
+        """
+        Initialize the preprocessor with optional max_width parameter.
+
+        :param md: Markdown instance
+        :param max_width: Maximum width for images in pixels (string or None)
+        """
+        super().__init__(md)
+        self.max_width = max_width
+
     def run(self, lines: list[str]) -> list[str]:
         """
         Converts image references with confluence-attachment: prefix to Confluence image macros.
@@ -36,11 +46,20 @@ class ImagePreprocessor(Preprocessor):
         for line in lines:
             # Replace confluence-attachment: image references with Confluence image macro
             # Pattern: ![alt](confluence-attachment:filename)
-            line = re.sub(
-                r'!\[([^\]]*)\]\(confluence-attachment:([^\)]+)\)',
-                r'<ac:image ac:alt="\1"><ri:attachment ri:filename="\2" /></ac:image>',
-                line
-            )
+            if self.max_width and self.max_width != '0' and self.max_width != '':
+                # Include width attribute if max_width is specified
+                line = re.sub(
+                    r'!\[([^\]]*)\]\(confluence-attachment:([^\)]+)\)',
+                    f'<ac:image ac:alt="\\1" ac:width="{self.max_width}"><ri:attachment ri:filename="\\2" /></ac:image>',
+                    line
+                )
+            else:
+                # No width restriction, use original size
+                line = re.sub(
+                    r'!\[([^\]]*)\]\(confluence-attachment:([^\)]+)\)',
+                    r'<ac:image ac:alt="\1"><ri:attachment ri:filename="\2" /></ac:image>',
+                    line
+                )
             modified_lines.append(line)
         return modified_lines
 
@@ -91,12 +110,24 @@ class ConfluenceExtension(Extension):
     """
     The extension to be included in the `extensions` argument of the :ref:`Markdown.markdown` function.
     """
+    def __init__(self, **kwargs):
+        """
+        Initialize the extension with optional configuration.
+
+        :param max_image_width: Maximum width for images in pixels (string or None)
+        """
+        self.config = {
+            'max_image_width': [None, 'Maximum width for images in pixels']
+        }
+        super().__init__(**kwargs)
+
     def extendMarkdown(self, md: Markdown):
         """
         Adds the processors to the extension.
         """
         md.registerExtension(self)
-        md.preprocessors.register(ImagePreprocessor(md), 'confluence_images', 0)
+        max_width = self.getConfig('max_image_width')
+        md.preprocessors.register(ImagePreprocessor(md, max_width=max_width), 'confluence_images', 0)
         md.preprocessors.register(SectionLinkPreprocessor(md), 'confluence_section_links', 1)
         md.postprocessors.register(CodeBlockPostprocessor(md), 'confluence_code_block', 0)
 

@@ -27,6 +27,13 @@ def main() -> None:
             raise InvalidParameterError(f"Error: Missing value for {key}")
         vars[key] = value
 
+    # Get optional max_image_width parameter
+    max_image_width = environ.get("INPUT_MAX_IMAGE_WIDTH", "800")
+    if max_image_width:
+        logging.info(f"Maximum image width set to: {max_image_width}px")
+    else:
+        logging.info("No image width restriction set")
+
     domain, page_id = extract_domain_and_page_id(vars["url"])
 
     # set up client
@@ -98,7 +105,8 @@ def main() -> None:
 
     # convert markdown file to html
     logging.info("Converting markdown file.")
-    converted_html = markdown.markdown(processed_md_text, extensions=['tables', 'fenced_code', ConfluenceExtension()])
+    confluence_ext = ConfluenceExtension(max_image_width=max_image_width)
+    converted_html = markdown.markdown(processed_md_text, extensions=['tables', 'fenced_code', confluence_ext])
 
     # insert markdown between insert_start_text and insert_end_text
     start_substring: str = vars["insert_start_text"]
