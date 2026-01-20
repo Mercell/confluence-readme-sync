@@ -2,11 +2,8 @@ FROM python:3-slim
 
 WORKDIR /action
 
-# Copy Pipfile and install dependencies
-COPY ./Pipfile ./
-RUN pip install pipenv && \
-  pipenv install --system && \
-  pipenv --clear
+# Install dependencies
+RUN pip install --no-cache-dir markdown requests python-dotenv
 
 # Copy all action files including source code
 COPY . /action
