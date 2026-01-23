@@ -113,8 +113,13 @@ def main() -> None:
     end_substring: str = vars["insert_end_text"]
     start_index = page_body.find(start_substring)
     end_index = page_body.find(end_substring)
-    if start_index == -1 or end_index == -1 or start_index > end_index: raise SubstringNotFoundError("Insert after string was not found in the body of the Confluence page")
-    page_body = page_body[:start_index + len(start_substring)] + converted_html + page_body[end_index:end_index + len(end_substring)] + page_body[end_index + len(end_substring):]
+    
+    if start_index == -1 or end_index == -1 or start_index > end_index:
+        # Markers not found or invalid - add them to the top of the document
+        logging.warning("Start/end markers not found in page body. Adding markers to the top of the document.")
+        page_body = start_substring + converted_html + end_substring + page_body
+    else:
+        page_body = page_body[:start_index + len(start_substring)] + converted_html + page_body[end_index:]
 
     # create edit page command
     input = EditPageCommandInput(domain, page_id, page_status, page_title, page_body, page_version_number)
